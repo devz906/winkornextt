@@ -94,12 +94,14 @@ public final class EmulatorEngineManager {
     }
 
     /// Prepares and launches the hybrid engine. Fails gracefully if binary is missing (placeholder-friendly).
+    /// On iOS, Process is not available; use emulatorLaunchEnvironment() with a native launcher (e.g. posix_spawn) when you add the engine.
     /// - Parameter arguments: Arguments to pass to the engine (e.g. path to exe, Wine prefix).
-    /// - Returns: Process handle if launched; nil if binary missing or launch failed.
-    public func launchEngine(arguments: [String] = []) -> Process? {
+    /// - Returns: true if launch was initiated, false if binary missing or launch failed.
+    public func launchEngine(arguments: [String] = []) -> Bool {
         guard let path = engineBinaryPath, hasEngineBinary else {
-            return nil
+            return false
         }
+        #if os(macOS)
         let process = Process()
         process.executableURL = URL(fileURLWithPath: path)
         process.arguments = arguments
@@ -107,10 +109,14 @@ public final class EmulatorEngineManager {
         process.currentDirectoryURL = URL(fileURLWithPath: (path as NSString).deletingLastPathComponent)
         do {
             try process.run()
-            return process
+            return true
         } catch {
-            return nil
+            return false
         }
+        #else
+        // iOS: Process is not in the SDK. Use emulatorLaunchEnvironment() with a native launcher (posix_spawn) when the engine is integrated.
+        return false
+        #endif
     }
 
     /// Ensures container directory exists (for Wine prefix and game files).
