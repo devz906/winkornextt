@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- JIT (Just-In-Time) support. Without this, Box64 would be ~10x slower. -->
+	<key>com.apple.security.cs.allow-jit</key>
+	<true/>
+	<!-- Increased Memory Limit for iOS 26.2 — mandatory to unlock full 8GB RAM for heavy Windows gaming. -->
+	<key>com.apple.developer.kernel.increased-memory-limit</key>
+	<true/>
+</dict>
+</plist>

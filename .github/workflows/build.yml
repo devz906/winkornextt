@@ -1,0 +1,93 @@
+# WinkorNext — build on GitHub (no Xcode required locally).
+# Generates the Xcode project with XcodeGen, then builds an unsigned IPA.
+# Build stays GREEN even when winkor_engine binary is missing (placeholder check).
+
+name: Build
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: |
+          if [ -d "/Applications/Xcode_26.3.app" ]; then
+            sudo xcode-select -s /Applications/Xcode_26.3.app/Contents/Developer
+          elif [ -d "/Applications/Xcode_26.2.app" ]; then
+            sudo xcode-select -s /Applications/Xcode_26.2.app/Contents/Developer
+          else
+            sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+          fi
+          xcodebuild -version
+
+      - name: Placeholder check — winkor_engine optional
+        id: placeholder
+        run: |
+          if [ -f "WinkorNext/Engine/winkor_engine" ] && [ -x "WinkorNext/Engine/winkor_engine" ]; then
+            echo "has_engine=true" >> $GITHUB_OUTPUT
+            echo "Found winkor_engine"
+          else
+            echo "has_engine=false" >> $GITHUB_OUTPUT
+            echo "winkor_engine not present (build continues)"
+          fi
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        run: |
+          if [ -f "WinkorNext/project.yml" ]; then
+            cd WinkorNext
+          fi
+          xcodegen generate
+
+      - name: Build for iOS
+        run: |
+          set -e
+          if [ -f "WinkorNext/project.yml" ]; then
+            cd WinkorNext
+          fi
+          xcodebuild -project WinkorNext.xcodeproj -scheme WinkorNext \
+            -destination 'generic/platform=iOS' \
+            -configuration Release \
+            -sdk iphoneos \
+            -derivedDataPath build/DerivedData \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            DEVELOPMENT_TEAM="" \
+            build
+
+      - name: Create Unsigned IPA
+        run: |
+          set -e
+          if [ -f "WinkorNext/project.yml" ]; then
+            cd WinkorNext
+          fi
+          APP_PATH="build/DerivedData/Build/Products/Release-iphoneos/WinkorNext.app"
+          [ -d "$APP_PATH" ] || APP_PATH=$(find build/DerivedData -name "WinkorNext.app" -type d | head -1)
+          if [ ! -d "$APP_PATH" ]; then
+            echo "WinkorNext.app not found"
+            exit 1
+          fi
+          mkdir -p build/IPA/Payload
+          cp -R "$APP_PATH" build/IPA/Payload/
+          (cd build/IPA && zip -r ../WinkorNext-unsigned.ipa Payload)
+          mkdir -p "$GITHUB_WORKSPACE/ipa-out"
+          cp build/WinkorNext-unsigned.ipa "$GITHUB_WORKSPACE/ipa-out/WinkorNext-unsigned.ipa"
+          echo "IPA ready at ipa-out/WinkorNext-unsigned.ipa"
+
+      - name: Upload Unsigned IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: WinkorNext-unsigned-ipa
+          path: ipa-out/WinkorNext-unsigned.ipa
